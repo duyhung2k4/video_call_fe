@@ -1,0 +1,187 @@
+import React, { useEffect, useRef, useState } from 'react';
+import Cookies from 'js-cookie';
+
+import { ROUTER } from '@/constants/router';
+import { Button, Stack } from '@mantine/core';
+import { useNavigate } from 'react-router';
+import { useNotification } from '@/hook/notification.hook';
+
+
+
+const AudioProcessor: React.FC = () => {
+  const uuid = Cookies.get("uuid");
+
+  const [isStarted, setIsStarted] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const micNodeRef = useRef<AudioWorkletNode | null>(null);
+  // const audioStreamsRef = useRef(new Map<string, { incomingBufferQueue: Float32Array[]; processingNode: AudioWorkletNode }>());
+  const socketRef = useRef<WebSocket | null>(null);
+
+  const noti = useNotification();
+  const navigation = useNavigate();
+
+  
+
+  // const applyFadeEffect = (audioBuffer: AudioBuffer) => {
+  //   const data = audioBuffer.getChannelData(0);
+  //   const fadeLength = Math.min(audioBuffer.sampleRate * 0.1, data.length);
+
+  //   // Fade-in
+  //   for (let i = 0; i < fadeLength; i++) {
+  //     data[i] *= i / fadeLength;
+  //   }
+
+  //   // Fade-out
+  //   for (let i = data.length - fadeLength; i < data.length; i++) {
+  //     data[i] *= (data.length - i) / fadeLength;
+  //   }
+  // };
+
+
+
+
+
+
+
+
+  const startAudioProcessing = async () => {
+    if(!uuid) {
+      noti.error("id ko tồn tại");
+      return;
+    }
+
+    const socket = new WebSocket(`${import.meta.env.VITE_API}/api/v1/connect-global-chanel?uuid=${uuid}`);
+    socketRef.current = socket;
+
+    socket.addEventListener('open', () => {
+      console.log('WebSocket connected');
+    });
+
+    const audioContext = new AudioContext({ sampleRate: 5000 });
+    audioContextRef.current = audioContext;
+    await audioContext.audioWorklet.addModule('/mic.js');
+
+    const micNode = new AudioWorkletNode(audioContext, 'mic-processor');
+    micNodeRef.current = micNode;
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const micSource = audioContext.createMediaStreamSource(stream);
+    micSource.connect(micNode);
+
+    micNode.port.onmessage = (e) => {
+      const audioBuffer = e.data[0];
+      const data = JSON.stringify({ data: Array.from(audioBuffer) });
+      socket.send(data);
+    };
+
+    const audioStreams = new Map();
+    const audioContextListen = new AudioContext({ sampleRate: 5000 });
+    await audioContextListen.audioWorklet.addModule('/process.js');
+
+    socket.addEventListener('message', (event) => {
+      const obj = JSON.parse(event.data);
+  
+      for (let uuid in obj) {
+        // Khởi tạo trạng thái nếu chưa có
+        if (!audioStreams.has(uuid)) {
+          const incomingBufferQueue: any = [];
+          const processingNode = new AudioWorkletNode(audioContextListen, 'processing-processor');
+  
+          // Tạo bộ lọc Low-pass
+          const lowPassFilter = audioContextListen.createBiquadFilter();
+          lowPassFilter.type = 'lowpass';
+          lowPassFilter.frequency.setValueAtTime(5000, audioContextListen.currentTime);
+  
+          // Kết nối các node
+          processingNode.connect(lowPassFilter);
+          lowPassFilter.connect(audioContextListen.destination);
+  
+          // Lưu trạng thái vào Map
+          audioStreams.set(uuid, { incomingBufferQueue, processingNode });
+        }
+  
+        const stream = audioStreams.get(uuid);
+        const float32Array = new Float32Array(obj[uuid]);
+        stream.incomingBufferQueue.push(...float32Array);
+  
+        // Xử lý nếu đủ 0.5 giây dữ liệu
+        if (stream.incomingBufferQueue.length >= audioContextListen.sampleRate * 0.5) {
+          const buffer = audioContextListen.createBuffer(1, stream.incomingBufferQueue.length, audioContextListen.sampleRate);
+          buffer.getChannelData(0).set(stream.incomingBufferQueue);
+          stream.incomingBufferQueue = []; // Xóa dữ liệu đã xử lý
+  
+          applyFadeEffect(buffer); // Thêm hiệu ứng fade-in/fade-out
+  
+          const sourceNode = audioContextListen.createBufferSource();
+          sourceNode.buffer = buffer;
+  
+          sourceNode.connect(stream.processingNode);
+          sourceNode.start();
+        }
+      }
+    });
+  
+    // Hàm thêm hiệu ứng fade-in và fade-out
+    const applyFadeEffect = (audioBuffer: any) => {
+      const data = audioBuffer.getChannelData(0);
+      const fadeLength = Math.min(audioBuffer.sampleRate * 0.1, data.length); // 0.1 giây fade
+  
+      // Fade-in
+      for (let i = 0; i < fadeLength; i++) {
+        data[i] *= i / fadeLength;
+      }
+  
+      // Fade-out
+      for (let i = data.length - fadeLength; i < data.length; i++) {
+        data[i] *= (data.length - i) / fadeLength;
+      }
+    };
+  };
+
+
+
+
+
+
+
+
+
+
+
+  useEffect(() => {
+    if(!uuid) {
+      navigation(ROUTER.CONNECTION.href);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      audioContextRef.current?.close();
+      socketRef.current?.close();
+    };
+  }, []);
+
+  return (
+    <Stack
+      style={{
+        height: "100%",
+        width: "100%",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <Button
+        onClick={() => {
+          if (!isStarted) {
+            startAudioProcessing();
+            setIsStarted(true);
+          }
+        }}
+      >
+        Start
+      </Button>
+    </Stack>
+  );
+};
+
+export default AudioProcessor;
