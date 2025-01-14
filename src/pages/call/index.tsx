@@ -179,7 +179,7 @@ const AudioProcessor: React.FC = () => {
           }
         }}
       >
-        {isStarted ? "Start" : "Calling"}
+        {!isStarted ? "Start" : "Calling"}
       </Button>
     </Stack>
   );
