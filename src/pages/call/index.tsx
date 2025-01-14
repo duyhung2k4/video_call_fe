@@ -171,6 +171,7 @@ const AudioProcessor: React.FC = () => {
       }}
     >
       <Button
+        disabled={isStarted}
         onClick={() => {
           if (!isStarted) {
             startAudioProcessing();
@@ -178,7 +179,7 @@ const AudioProcessor: React.FC = () => {
           }
         }}
       >
-        Start
+        {isStarted ? "Start" : "Calling"}
       </Button>
     </Stack>
   );
