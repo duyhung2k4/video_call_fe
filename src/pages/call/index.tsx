@@ -14,38 +14,15 @@ const AudioProcessor: React.FC = () => {
   const [isStarted, setIsStarted] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const micNodeRef = useRef<AudioWorkletNode | null>(null);
-  // const audioStreamsRef = useRef(new Map<string, { incomingBufferQueue: Float32Array[]; processingNode: AudioWorkletNode }>());
   const socketRef = useRef<WebSocket | null>(null);
 
   const noti = useNotification();
   const navigation = useNavigate();
 
-  
-
-  // const applyFadeEffect = (audioBuffer: AudioBuffer) => {
-  //   const data = audioBuffer.getChannelData(0);
-  //   const fadeLength = Math.min(audioBuffer.sampleRate * 0.1, data.length);
-
-  //   // Fade-in
-  //   for (let i = 0; i < fadeLength; i++) {
-  //     data[i] *= i / fadeLength;
-  //   }
-
-  //   // Fade-out
-  //   for (let i = data.length - fadeLength; i < data.length; i++) {
-  //     data[i] *= (data.length - i) / fadeLength;
-  //   }
-  // };
-
-
-
-
-
-
 
 
   const startAudioProcessing = async () => {
-    if(!uuid) {
+    if (!uuid) {
       noti.error("id ko tồn tại");
       return;
     }
@@ -80,57 +57,51 @@ const AudioProcessor: React.FC = () => {
 
     socket.addEventListener('message', (event) => {
       const obj = JSON.parse(event.data);
-  
+
       for (let uuid in obj) {
-        // Khởi tạo trạng thái nếu chưa có
         if (!audioStreams.has(uuid)) {
           const incomingBufferQueue: any = [];
           const processingNode = new AudioWorkletNode(audioContextListen, 'processing-processor');
-  
-          // Tạo bộ lọc Low-pass
+
           const lowPassFilter = audioContextListen.createBiquadFilter();
           lowPassFilter.type = 'lowpass';
           lowPassFilter.frequency.setValueAtTime(5000, audioContextListen.currentTime);
-  
-          // Kết nối các node
+
           processingNode.connect(lowPassFilter);
           lowPassFilter.connect(audioContextListen.destination);
-  
-          // Lưu trạng thái vào Map
+
           audioStreams.set(uuid, { incomingBufferQueue, processingNode });
         }
-  
+
         const stream = audioStreams.get(uuid);
         const float32Array = new Float32Array(obj[uuid]);
         stream.incomingBufferQueue.push(...float32Array);
-  
-        // Xử lý nếu đủ 0.5 giây dữ liệu
+
         if (stream.incomingBufferQueue.length >= audioContextListen.sampleRate * 0.5) {
           const buffer = audioContextListen.createBuffer(1, stream.incomingBufferQueue.length, audioContextListen.sampleRate);
           buffer.getChannelData(0).set(stream.incomingBufferQueue);
-          stream.incomingBufferQueue = []; // Xóa dữ liệu đã xử lý
-  
-          applyFadeEffect(buffer); // Thêm hiệu ứng fade-in/fade-out
-  
+          stream.incomingBufferQueue = [];
+
+          applyFadeEffect(buffer);
+
           const sourceNode = audioContextListen.createBufferSource();
           sourceNode.buffer = buffer;
-  
+
           sourceNode.connect(stream.processingNode);
           sourceNode.start();
         }
       }
     });
-  
-    // Hàm thêm hiệu ứng fade-in và fade-out
+
     const applyFadeEffect = (audioBuffer: any) => {
       const data = audioBuffer.getChannelData(0);
       const fadeLength = Math.min(audioBuffer.sampleRate * 0.1, data.length); // 0.1 giây fade
-  
+
       // Fade-in
       for (let i = 0; i < fadeLength; i++) {
         data[i] *= i / fadeLength;
       }
-  
+
       // Fade-out
       for (let i = data.length - fadeLength; i < data.length; i++) {
         data[i] *= (data.length - i) / fadeLength;
@@ -140,16 +111,8 @@ const AudioProcessor: React.FC = () => {
 
 
 
-
-
-
-
-
-
-
-
   useEffect(() => {
-    if(!uuid) {
+    if (!uuid) {
       navigation(ROUTER.CONNECTION.href);
     }
   }, []);
@@ -160,6 +123,8 @@ const AudioProcessor: React.FC = () => {
       socketRef.current?.close();
     };
   }, []);
+
+
 
   return (
     <Stack
