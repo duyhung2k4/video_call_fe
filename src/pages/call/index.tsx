@@ -57,6 +57,7 @@ const AudioProcessor: React.FC = () => {
 
     socket.addEventListener('message', (event) => {
       const obj = JSON.parse(event.data);
+      console.log(obj);
 
       for (let uuid in obj) {
         if (!audioStreams.has(uuid)) {
