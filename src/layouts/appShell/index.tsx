@@ -77,7 +77,7 @@ const AppshellLayout: React.FC = () => {
                     <Group p={16} pb={36}>
                         <IconBrandDatabricks />
                         <BoxShow>
-                            <Text><span className={classes.title_app}>H</span>Learning</Text>
+                            <Text><span className={classes.title_app}>s</span>VideoCall</Text>
                         </BoxShow>
                     </Group>
                     <Stack className={classes.links}>
