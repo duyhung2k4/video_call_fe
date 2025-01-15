@@ -22,6 +22,8 @@ const AudioProcessor: React.FC = () => {
 
 
   const startAudioProcessing = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
     if (!uuid) {
       noti.error("id ko tồn tại");
       return;
@@ -33,15 +35,14 @@ const AudioProcessor: React.FC = () => {
     socket.addEventListener('open', () => {
       console.log('WebSocket connected');
     });
-
+    
     const audioContext = new AudioContext({ sampleRate: 5000 });
     audioContextRef.current = audioContext;
     await audioContext.audioWorklet.addModule('/mic.js');
-
+    
     const micNode = new AudioWorkletNode(audioContext, 'mic-processor');
     micNodeRef.current = micNode;
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  
     const micSource = audioContext.createMediaStreamSource(stream);
     micSource.connect(micNode);
 
