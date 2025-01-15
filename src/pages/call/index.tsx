@@ -142,10 +142,22 @@ const AudioProcessor: React.FC = () => {
     >
       <Button
         disabled={isStarted}
-        onClick={() => {
-          if (!isStarted) {
-            startAudioProcessing();
-            setIsStarted(true);
+        onClick={async () => {
+          // if (!isStarted) {
+          //   startAudioProcessing();
+          //   setIsStarted(true);
+          // }
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log('Microphone stream:', stream);
+          } catch (error: any) {
+            if (error.name === 'NotAllowedError') {
+              console.error('Permission denied. Please check microphone access in Safari settings.');
+            } else if (error.name === 'NotFoundError') {
+              console.error('No microphone device found.');
+            } else {
+              console.error('Unknown error:', error);
+            }
           }
         }}
       >
